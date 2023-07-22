@@ -38,6 +38,10 @@ async function main() {
 
   console.log(`Starting server on port ${PORT}`);
   const app = new Application();
+  app.use(async (ctx, next) => {
+    await next();
+    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+  });
   app.use(router.routes());
   app.use(router.allowedMethods());
   app.addEventListener("error", (event: Deno.EventError) => {
@@ -104,7 +108,7 @@ function updateTodo(id: number, body: string, status: number) {
 
 function deletetodo(id: number) {
   db.query("DELETE FROM todos WHERE id = :id;", [id]);
-  return {deleted: db.changes};
+  return { deleted: db.changes };
 }
 
 main();
