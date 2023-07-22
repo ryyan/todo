@@ -11,7 +11,7 @@ const NumToStatus = {
   1: "Done",
 };
 
-class Task {
+class Todo {
   id: number;
   body: string;
   status: string;
@@ -28,7 +28,7 @@ class Task {
 async function main() {
   console.log(`Initializing database ${DB_NAME}`);
   db.execute(`
-    CREATE TABLE IF NOT EXISTS tasks (
+    CREATE TABLE IF NOT EXISTS todos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       body TEXT NOT NULL,
       status INTEGER NOT NULL,
@@ -48,62 +48,62 @@ async function main() {
 
 const router = new Router();
 router
-  .get("/task", async (ctx: Context) => {
-    ctx.response.body = getTasks();
+  .get("/todo", async (ctx: Context) => {
+    ctx.response.body = listTodos();
   })
-  .get("/task/:id", async (ctx: Context) => {
-    ctx.response.body = getTask(ctx.params.id);
+  .get("/todo/:id", async (ctx: Context) => {
+    ctx.response.body = getTodo(ctx.params.id);
   })
-  .post("/task", async (ctx: Context) => {
+  .post("/todo", async (ctx: Context) => {
     const formData = ctx.request.body();
     const params = await formData.value;
     const body = params.get("body");
-    ctx.response.body = createTask(body);
+    ctx.response.body = createTodo(body);
   })
-  .put("/task/:id", async (ctx: Context) => {
+  .put("/todo/:id", async (ctx: Context) => {
     const formData = ctx.request.body();
     const params = await formData.value;
     const body = params.get("body");
     const status = params.get("status");
-    ctx.response.body = updateTask(ctx.params.id, body, status);
+    ctx.response.body = updateTodo(ctx.params.id, body, status);
   })
-  .delete("/task/:id", async (ctx: Context) => {
-    ctx.response.body = deleteTask(ctx.params.id);
+  .delete("/todo/:id", async (ctx: Context) => {
+    ctx.response.body = deletetodo(ctx.params.id);
   });
 
-function getTasks() {
-  const tasks = db.query("SELECT * FROM tasks;");
+function listTodos() {
+  const todos = db.query("SELECT * FROM todos;");
 
-  let result: Task[] = [];
-  for (const task of tasks) {
-    result.push(new Task(task[0], task[1], task[2], task[3]));
+  let result: Todo[] = [];
+  for (const todo of todos) {
+    result.push(new Todo(todo[0], todo[1], todo[2], todo[3]));
   }
 
   return result;
 }
 
-function getTask(id: number) {
-  const tasks = db.query("SELECT * FROM tasks WHERE id = :id;", [id]);
+function getTodo(id: number) {
+  const todos = db.query("SELECT * FROM todos WHERE id = :id;", [id]);
 
-  for (const task of tasks) {
-    return new Task(task[0], task[1], task[2], task[3]);
+  for (const todo of todos) {
+    return new Todo(todo[0], todo[1], todo[2], todo[3]);
   }
 }
 
-function createTask(body: string) {
-  db.query("INSERT INTO tasks (body, status) VALUES (?,?);", [body, 0]);
-  return getTask(db.lastInsertRowId);
+function createTodo(body: string) {
+  db.query("INSERT INTO todos (body, status) VALUES (?,?);", [body, 0]);
+  return getTodo(db.lastInsertRowId);
 }
 
-function updateTask(id: number, body: string, status: number) {
+function updateTodo(id: number, body: string, status: number) {
   return db.query(
-    "UPDATE tasks SET body = :body, status = :status WHERE id = :id;",
+    "UPDATE todos SET body = :body, status = :status WHERE id = :id;",
     [body, status, id],
   );
 }
 
-function deleteTask(id: number) {
-  db.query("DELETE FROM tasks WHERE id = :id;", [id]);
+function deletetodo(id: number) {
+  db.query("DELETE FROM todos WHERE id = :id;", [id]);
   return {deleted: db.changes};
 }
 
