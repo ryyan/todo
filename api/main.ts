@@ -6,22 +6,21 @@ const db = new DB(DB_NAME);
 
 const PORT = 8080;
 
-const NumToTask = {
+const NumToStatus = {
   0: "Do",
-  1: "Doing",
-  2: "Done",
+  1: "Done",
 };
 
 class Task {
   id: number;
-  note: string;
+  body: string;
   status: string;
   timestamp: number;
 
-  constructor(id: number, note: string, status: number, timestamp: number) {
+  constructor(id: number, body: string, status: number, timestamp: number) {
     this.id = id;
-    this.note = note;
-    this.status = NumToTask[status];
+    this.body = body;
+    this.status = NumToStatus[status];
     this.timestamp = timestamp;
   }
 }
@@ -31,7 +30,7 @@ async function main() {
   db.execute(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      note TEXT NOT NULL,
+      body TEXT NOT NULL,
       status INTEGER NOT NULL,
       timestamp INTEGER NOT NULL DEFAULT (unixepoch())
     )
@@ -58,15 +57,15 @@ router
   .post("/task", async (ctx: Context) => {
     const formData = ctx.request.body();
     const params = await formData.value;
-    const note = params.get("note");
-    ctx.response.body = createTask(note);
+    const body = params.get("body");
+    ctx.response.body = createTask(body);
   })
   .put("/task/:id", async (ctx: Context) => {
     const formData = ctx.request.body();
     const params = await formData.value;
-    const note = params.get("note");
+    const body = params.get("body");
     const status = params.get("status");
-    ctx.response.body = updateTask(ctx.params.id, note, status);
+    ctx.response.body = updateTask(ctx.params.id, body, status);
   })
   .delete("/task/:id", async (ctx: Context) => {
     ctx.response.body = deleteTask(ctx.params.id);
@@ -91,19 +90,21 @@ function getTask(id: number) {
   }
 }
 
-function createTask(note: string) {
-  return db.query("INSERT INTO tasks (note, status) VALUES (?,?);", [note, 0]);
+function createTask(body: string) {
+  db.query("INSERT INTO tasks (body, status) VALUES (?,?);", [body, 0]);
+  return getTask(db.lastInsertRowId);
 }
 
-function updateTask(id: number, note: string, status: number) {
+function updateTask(id: number, body: string, status: number) {
   return db.query(
-    "UPDATE tasks SET note = :note, status = :status WHERE id = :id;",
-    [note, status, id],
+    "UPDATE tasks SET body = :body, status = :status WHERE id = :id;",
+    [body, status, id],
   );
 }
 
 function deleteTask(id: number) {
-  return db.query("DELETE FROM tasks WHERE id = :id;", [id]);
+  db.query("DELETE FROM tasks WHERE id = :id;", [id]);
+  return {deleted: db.changes};
 }
 
 main();
