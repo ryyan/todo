@@ -1,5 +1,7 @@
 # TODO
 
+https://github.com/ryyan/todo/assets/4228816/56f70bfe-851d-4d2f-b619-eb57aa0554a0
+
 ## Getting Started
 
 ### Prereqs
@@ -16,8 +18,8 @@ deno task run
 
 ```sh
 cd web
-npm i
-npm run
+npm install
+npm run dev
 ```
 
 #### Example API Commands
