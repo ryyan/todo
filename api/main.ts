@@ -6,22 +6,17 @@ const db = new DB(DB_NAME);
 
 const PORT = 8080;
 
-const NumToStatus = {
-  0: "Do",
-  1: "Done",
-};
-
 class Todo {
   id: number;
   body: string;
-  status: string;
-  timestamp: number;
+  status: number;
+  ts: number;
 
   constructor(id: number, body: string, status: number, timestamp: number) {
     this.id = id;
     this.body = body;
-    this.status = NumToStatus[status];
-    this.timestamp = timestamp;
+    this.status = status;
+    this.ts = timestamp;
   }
 }
 
@@ -36,17 +31,30 @@ async function main() {
     )
   `);
 
-  console.log(`Starting server on port ${PORT}`);
+  console.log("Setting up API");
   const app = new Application();
+
+  // Set CORS headers
   app.use(async (ctx, next) => {
     await next();
     ctx.response.headers.set("Access-Control-Allow-Origin", "*");
+    ctx.response.headers.set(
+      "Access-Control-Allow-Headers",
+      "Origin, Content-Type",
+    );
+    ctx.response.headers.set(
+      "Access-Control-Allow-Methods",
+      "POST, GET, PUT, DELETE, OPTIONS",
+    );
   });
+
   app.use(router.routes());
   app.use(router.allowedMethods());
   app.addEventListener("error", (event: Deno.EventError) => {
     console.error(event.error);
   });
+
+  console.log(`Starting server on port ${PORT}`);
   await app.listen({ port: PORT });
 }
 
@@ -61,34 +69,35 @@ router
   .post("/todo", async (ctx: Context) => {
     const formData = ctx.request.body();
     const params = await formData.value;
-    const body = params.get("body");
+    const body = params.body;
     ctx.response.body = createTodo(body);
   })
   .put("/todo/:id", async (ctx: Context) => {
     const formData = ctx.request.body();
     const params = await formData.value;
-    const body = params.get("body");
-    const status = params.get("status");
-    ctx.response.body = updateTodo(ctx.params.id, body, status);
+    const status = params.status;
+    ctx.response.body = updateTodo(ctx.params.id, status);
   })
   .delete("/todo/:id", async (ctx: Context) => {
     ctx.response.body = deletetodo(ctx.params.id);
   });
 
 function listTodos() {
-  const todos = db.query("SELECT * FROM todos;");
+  const todos = db.query("SELECT id, body, status, timestamp FROM todos;");
 
   let result: Todo[] = [];
   for (const todo of todos) {
     result.push(new Todo(todo[0], todo[1], todo[2], todo[3]));
   }
 
-  return result;
+  return {
+    "todo": result.filter((todo) => todo.status === 0),
+    "done": result.filter((todo) => todo.status === 1),
+  };
 }
 
 function getTodo(id: number) {
   const todos = db.query("SELECT * FROM todos WHERE id = :id;", [id]);
-
   for (const todo of todos) {
     return new Todo(todo[0], todo[1], todo[2], todo[3]);
   }
@@ -99,10 +108,10 @@ function createTodo(body: string) {
   return getTodo(db.lastInsertRowId);
 }
 
-function updateTodo(id: number, body: string, status: number) {
+function updateTodo(id: number, status: number) {
   return db.query(
-    "UPDATE todos SET body = :body, status = :status WHERE id = :id;",
-    [body, status, id],
+    "UPDATE todos SET status = :status WHERE id = :id;",
+    [status, id],
   );
 }
 
