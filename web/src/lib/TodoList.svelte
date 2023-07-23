@@ -1,5 +1,7 @@
 <script>
-	import Todo from '$lib/Todo.svelte';
+	import { flip } from 'svelte/animate';
+	import { quintIn, quintOut } from 'svelte/easing';
+	import { crossfade } from 'svelte/transition';
 	import { TodoType, TodoUtil } from '$lib/todo.js';
 
 	/** @type {Array.<TodoType>} */
@@ -11,6 +13,25 @@
 	const todoUtil = new TodoUtil();
 	let newBody = '';
 
+	const [send, receive] = crossfade({
+		duration: 600,
+		easing: quintOut,
+
+		fallback(node, params) {
+			const style = getComputedStyle(node);
+			const transform = style.transform === 'none' ? '' : style.transform;
+
+			return {
+				duration: 600,
+				easing: quintOut,
+				css: (t) => `
+					transform: ${transform} scale(${t});
+					opacity: ${t}
+				`
+			};
+		}
+	});
+
 	async function creatTodo(event) {
 		console.log(`creatTodo body=${newBody}`);
 		const newTodo = await todoUtil.createTodo(newBody);
@@ -20,26 +41,23 @@
 		todoList = [...todoList, newTodo];
 	}
 
-	async function updateStatusToDone(event) {
-		const todoId = event.detail.todo.id;
-		console.log(`updateStatusToDone: todoId=${todoId}`);
-		await todoUtil.updateTodo(todoId, 1);
+	async function updateStatusToDone(todo) {
+		console.log(`updateStatusToDone: todo=${todo}`);
+		await todoUtil.updateTodo(todo.id, 1);
 
 		// Remove item from todo list
-		todoList = todoList.filter((todo) => todo.id !== todoId);
+		todoList = todoList.filter((x) => x.id !== todo.id);
 
 		// Add item to done list
-		event.detail.todo.status = 1;
-		doneList = [...doneList, event.detail.todo];
+		doneList = doneList.concat(todo);
 	}
 
-	async function deleteTodo(event) {
-		const todoId = event.detail.todo.id;
-		console.log(`deleteTodo: todoId=${todoId}`);
-		await todoUtil.deleteTodo(todoId);
+	async function deleteTodo(todo) {
+		console.log(`deleteTodo: todo=${todo}`);
+		await todoUtil.deleteTodo(todo.id);
 
 		// Remove item from done list
-		doneList = doneList.filter((todo) => todo.id !== todoId);
+		doneList = doneList.filter((x) => x.id !== todo.id);
 	}
 </script>
 
@@ -48,10 +66,27 @@
 	<input bind:value={newBody} />
 </div>
 
-{#each todoList as todo}
-	<Todo {todo} on:updateStatus={updateStatusToDone} />
+{#each todoList as todo (todo.id)}
+	<div in:receive={{ key: todo.id }} out:send={{ key: todo.id }} animate:flip>
+		<button on:click={() => updateStatusToDone(todo)}>✔️</button>
+		{todo.body}
+	</div>
 {/each}
 
-{#each doneList as todo}
-	<Todo {todo} on:updateStatus={deleteTodo} />
+{#each doneList as todo (todo.id)}
+	<div in:receive={{ key: todo.id }} out:send={{ key: todo.id }} animate:flip class="done">
+		<button on:click={() => deleteTodo(todo)}>🗑️</button>
+		{todo.body}
+	</div>
 {/each}
+
+<style>
+	div {
+		padding-top: 4px;
+		text-align: justify;
+	}
+
+	div.done {
+		text-decoration: line-through;
+	}
+</style>

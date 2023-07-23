@@ -5,5 +5,16 @@
 	export let data;
 </script>
 
-<h1>TODO</h1>
-<TodoList todoList={data.todoList} doneList={data.doneList} />
+<div>
+	<h1>TODO</h1>
+	<TodoList todoList={data.todoList} doneList={data.doneList} />
+</div>
+
+<style>
+	div {
+		margin: auto;
+		width: 50%;
+		padding: 10px;
+		text-align: justify;
+	}
+</style>
