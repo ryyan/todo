@@ -1,0 +1,16 @@
+{
+  "name": "todo-monorepo",
+  "private": true,
+  "scripts": {
+    "serve": "bun x concurrently -n \"api,web\" -c \"cyan,magenta\" \"cd api && bun start\" \"cd web && bun run serve\"",
+    "dev": "bun x concurrently -n \"api,web\" -c \"cyan,magenta\" \"cd api && bun start\" \"cd web && bun run dev -- --host\"",
+    "build": "cd api && bun install && cd ../web && bun install && bun run build",
+    "start": "bun run serve",
+    "lint": "cd web && bun run lint",
+    "check": "cd web && bun run check",
+    "format": "cd web && bun run format"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

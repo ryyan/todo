@@ -1,82 +1,59 @@
-# TODO
+# TODO Application
 
-https://github.com/ryyan/todo/assets/4228816/56f70bfe-851d-4d2f-b619-eb57aa0554a0
+A high-performance, full-stack TODO application built with a modern architecture.
 
-## Getting Started
+- **Backend:** [Bun](https://bun.sh/) + [SQLite](https://bun.sh/docs/api/sqlite)
+- **Frontend:** [Svelte 5](https://svelte.dev/) + [SvelteKit](https://kit.svelte.dev/)
 
-### Prereqs
+## Production Deployment
 
-- [Deno](https://deno.com/runtime)
-- [Svelte](https://svelte.dev/)
+The project is optimized for production use with a unified serving command.
 
-### Run
+### Prerequisites
 
-```sh
-cd api
-deno task run
+You need [Bun](https://bun.sh/) installed on your system.
+
+### Installation & Build
+
+Install all dependencies and create a production build of the frontend:
+
+```bash
+bun run build
 ```
 
-```sh
-cd web
-npm install
-npm run dev
+### Serve (Production)
+
+To start both the API and the production-built Web UI:
+
+```bash
+bun run serve
 ```
 
-#### Example API Commands
+The Web UI will be available at [http://localhost:5173](http://localhost:5173) and the API at [http://localhost:8080](http://localhost:8080).
 
-Ran using [httpie](https://github.com/httpie/httpie)
+## Development
 
-```sh
-# Create todo
-$ http PUT localhost:8080/todo <<< '{"body": "Create TODO app"}'
+To start the backend and the frontend in development mode (with Hot Module Replacement):
+
+```bash
+bun run dev
 ```
 
-```sh
-# List todos
-$ http localhost:8080/todo
-{
-    "done": [
-        {
-            "body": "Laundry",
-            "id": 2,
-            "status": 1,
-            "ts": 1690074691
-        }
-    ],
-    "todo": [
-        {
-            "body": "Create TODO app",
-            "id": 1,
-            "status": 0,
-            "ts": 1690074605
-        },
-        {
-            "body": "Dishes",
-            "id": 3,
-            "status": 0,
-            "ts": 1690074694
-        }
-    ]
-}
-```
+## Scripts
 
-```sh
-# Get todo
-$ http localhost:8080/todo/1
-{
-    "body": "Create TODO app",
-    "id": 1,
-    "status": 0,
-    "timestamp": 1690074605
-}
-```
+| Command | Action |
+| --- | --- |
+| `bun run serve` | Run production-built API and Web UI |
+| `bun run build` | Build the entire monorepo for production |
+| `bun run dev` | Run full stack in development mode |
+| `bun run check` | Run Svelte-Check |
+| `bun run lint` | Run ESLint and Prettier checks |
+| `bun run format` | Auto-format the entire codebase |
 
-```sh
-# Update todo status to Done
-$ http PUT localhost:8080/todo/1 <<< '{"status": 1}'
-```
+---
 
-```sh
-# Delete todo
-$ http DELETE localhost:8080/todo/1
-```
+## Technical Architecture
+
+- **Backend (`api/`):** Pure Bun-native server using `URLPattern` for routing and pre-compiled SQLite statements for speed.
+- **Frontend (`web/`):** Svelte 5 with the Node.js adapter for stable serving via Bun.
+- **Security:** API includes standard security headers (`nosniff`, `X-Frame-Options`) and refined CORS handling.

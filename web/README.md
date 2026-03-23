@@ -1,22 +1,38 @@
-## Developing
+# TODO Web UI
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+A modern, reactive user interface built with [Svelte 5](https://svelte.dev/).
+
+## Features
+
+- **Framework:** Svelte 5 + SvelteKit
+- **Styling:** Vanilla CSS
+- **State Management:** Svelte Runes (`$state`, `$props`, `$bindable`)
+- **Animations:** Svelte Transitions & FLIP animations
+
+## Development
+
+Install dependencies:
 
 ```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+bun install
 ```
 
-## Building
-
-To create a production version of your app:
+Start the development server:
 
 ```bash
-npm run build
+bun run dev
 ```
 
-You can preview the production build with `npm run preview`.
+Build for production:
 
-> To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
+```bash
+bun run build
+```
+
+## Modern Architecture
+
+This project uses the latest Svelte 5 paradigms, including:
+
+- **Runes:** For granular and efficient reactivity.
+- **Event Attributes:** Standard `onclick` instead of `on:click`.
+- **Props:** Structured `$props()` for better type safety and clarity.

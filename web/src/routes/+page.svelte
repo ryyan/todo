@@ -1,8 +1,7 @@
 <script>
 	import TodoList from '$lib/TodoList.svelte';
 
-	/** @type {import('./$types').PageData} */
-	export let data;
+	let { data } = $props();
 </script>
 
 <div>

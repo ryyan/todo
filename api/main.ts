@@ -1,123 +1,160 @@
-import { Application, Context, Router } from "https://deno.land/x/oak/mod.ts";
-import { DB } from "https://deno.land/x/sqlite/mod.ts";
+import { Database } from 'bun:sqlite';
 
-const DB_NAME = "todo.db";
-const db = new DB(DB_NAME);
+const PORT = parseInt(process.env.PORT || '8080', 10);
+const DB_NAME = process.env.DB_NAME || 'todo.db';
+const db = new Database(DB_NAME);
 
-const PORT = 8080;
+// Initialize Database
+db.exec(`
+  CREATE TABLE IF NOT EXISTS todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    body TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    timestamp INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`);
 
-class Todo {
-  id: number;
-  body: string;
-  status: number;
-  ts: number;
+type Todo = {
+	id: number;
+	body: string;
+	status: number;
+	timestamp: number;
+};
 
-  constructor(id: number, body: string, status: number, timestamp: number) {
-    this.id = id;
-    this.body = body;
-    this.status = status;
-    this.ts = timestamp;
-  }
-}
+// Pre-compiled SQL statements for maximum performance
+const statements = {
+	list: db.query<Todo, []>('SELECT * FROM todos;'),
+	get: db.query<Todo, { $id: number }>('SELECT * FROM todos WHERE id = $id;'),
+	insert: db.prepare<Todo, { $body: string }>(
+		'INSERT INTO todos (body, status) VALUES ($body, 0) RETURNING id, body, status, timestamp;'
+	),
+	update: db.prepare<Todo, { $status: number; $id: number }>(
+		'UPDATE todos SET status = $status WHERE id = $id RETURNING id, body, status, timestamp;'
+	),
+	delete: db.prepare<{ id: number }, { $id: number }>('DELETE FROM todos WHERE id = $id RETURNING id;')
+};
 
-async function main() {
-  console.log(`Initializing database ${DB_NAME}`);
-  db.execute(`
-    CREATE TABLE IF NOT EXISTS todos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      body TEXT NOT NULL,
-      status INTEGER NOT NULL,
-      timestamp INTEGER NOT NULL DEFAULT (unixepoch())
-    )
-  `);
+// Production-ready security and CORS headers
+const SECURITY_HEADERS = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'POST, GET, PUT, DELETE, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type',
+	'X-Content-Type-Options': 'nosniff',
+	'X-Frame-Options': 'DENY',
+	'Referrer-Policy': 'strict-origin-when-cross-origin'
+};
 
-  console.log("Setting up API");
-  const app = new Application();
+const ROUTES = {
+	LIST: new URLPattern({ pathname: '/todo{/}?' }),
+	ITEM: new URLPattern({ pathname: '/todo/:id{/}?' })
+};
 
-  // Set CORS headers
-  app.use(async (ctx, next) => {
-    await next();
-    ctx.response.headers.set("Access-Control-Allow-Origin", "*");
-    ctx.response.headers.set(
-      "Access-Control-Allow-Headers",
-      "Origin, Content-Type",
-    );
-    ctx.response.headers.set(
-      "Access-Control-Allow-Methods",
-      "POST, GET, PUT, DELETE, OPTIONS",
-    );
-  });
-
-  app.use(router.routes());
-  app.use(router.allowedMethods());
-  app.addEventListener("error", (event: Deno.EventError) => {
-    console.error(event.error);
-  });
-
-  console.log(`Starting server on port ${PORT}`);
-  await app.listen({ port: PORT });
-}
-
-const router = new Router();
-router
-  .get("/todo", async (ctx: Context) => {
-    ctx.response.body = listTodos();
-  })
-  .get("/todo/:id", async (ctx: Context) => {
-    ctx.response.body = getTodo(ctx.params.id);
-  })
-  .post("/todo", async (ctx: Context) => {
-    const formData = ctx.request.body();
-    const params = await formData.value;
-    const body = params.body;
-    ctx.response.body = createTodo(body);
-  })
-  .put("/todo/:id", async (ctx: Context) => {
-    const formData = ctx.request.body();
-    const params = await formData.value;
-    const status = params.status;
-    ctx.response.body = updateTodo(ctx.params.id, status);
-  })
-  .delete("/todo/:id", async (ctx: Context) => {
-    ctx.response.body = deletetodo(ctx.params.id);
-  });
+/**
+ * Route Handlers
+ */
 
 function listTodos() {
-  const todos = db.query("SELECT id, body, status, timestamp FROM todos;");
+	const todos = statements.list.all();
+	return Response.json(
+		{
+			todo: todos.filter((t) => t.status === 0),
+			done: todos.filter((t) => t.status === 1)
+		},
+		{ headers: SECURITY_HEADERS }
+	);
+}
 
-  let result: Todo[] = [];
-  for (const todo of todos) {
-    result.push(new Todo(todo[0], todo[1], todo[2], todo[3]));
-  }
-
-  return {
-    "todo": result.filter((todo) => todo.status === 0),
-    "done": result.filter((todo) => todo.status === 1),
-  };
+async function createTodo(req: Request) {
+	const { body } = await req.json();
+	if (!body) {
+		return new Response(JSON.stringify({ error: 'Body required' }), {
+			status: 400,
+			headers: { ...SECURITY_HEADERS, 'Content-Type': 'application/json' }
+		});
+	}
+	const todo = statements.insert.get({ $body: body });
+	return Response.json(todo, { headers: SECURITY_HEADERS });
 }
 
 function getTodo(id: number) {
-  const todos = db.query("SELECT * FROM todos WHERE id = :id;", [id]);
-  for (const todo of todos) {
-    return new Todo(todo[0], todo[1], todo[2], todo[3]);
-  }
+	const todo = statements.get.get({ $id: id });
+	return todo
+		? Response.json(todo, { headers: SECURITY_HEADERS })
+		: new Response(JSON.stringify({ error: 'Not found' }), {
+				status: 404,
+				headers: { ...SECURITY_HEADERS, 'Content-Type': 'application/json' }
+			});
 }
 
-function createTodo(body: string) {
-  db.query("INSERT INTO todos (body, status) VALUES (?,?);", [body, 0]);
-  return getTodo(db.lastInsertRowId);
+async function updateTodo(id: number, req: Request) {
+	const { status } = await req.json();
+	const todo = statements.update.get({ $status: status, $id: id });
+	return todo
+		? Response.json(todo, { headers: SECURITY_HEADERS })
+		: new Response(JSON.stringify({ error: 'Not found' }), {
+				status: 404,
+				headers: { ...SECURITY_HEADERS, 'Content-Type': 'application/json' }
+			});
 }
 
-function updateTodo(id: number, status: number) {
-  return db.query(
-    "UPDATE todos SET status = :status WHERE id = :id;",
-    [status, id],
-  );
+function deleteTodo(id: number) {
+	const result = statements.delete.get({ $id: id });
+	return Response.json({ deleted: result ? 1 : 0 }, { headers: SECURITY_HEADERS });
 }
 
-function deletetodo(id: number) {
-  db.query("DELETE FROM todos WHERE id = :id;", [id]);
-  return { deleted: db.changes };
-}
+/**
+ * Main Server Export
+ */
 
-main();
+export default {
+	port: PORT,
+	hostname: '0.0.0.0',
+	async fetch(req: Request) {
+		const url = new URL(req.url);
+		const method = req.method;
+
+		// 1. CORS Preflight
+		if (method === 'OPTIONS') {
+			return new Response(null, { headers: SECURITY_HEADERS });
+		}
+
+		try {
+			// 2. Collection Routing (/todo)
+			if (ROUTES.LIST.test(url)) {
+				if (method === 'GET') return listTodos();
+				if (method === 'POST') return createTodo(req);
+			}
+
+			// 3. Item Routing (/todo/:id)
+			const itemMatch = ROUTES.ITEM.exec(url);
+			if (itemMatch) {
+				const id = parseInt(itemMatch.pathname.groups.id!, 10);
+				if (method === 'GET') return getTodo(id);
+				if (method === 'PUT') return updateTodo(id, req);
+				if (method === 'DELETE') return deleteTodo(id);
+			}
+
+			// 4. Default Not Found
+			return new Response(JSON.stringify({ error: 'Not Found' }), {
+				status: 404,
+				headers: { ...SECURITY_HEADERS, 'Content-Type': 'application/json' }
+			});
+		} catch (e) {
+			console.error(`Request error: ${method} ${url.pathname}`, e);
+			return new Response(JSON.stringify({ error: 'Internal Server Error' }), {
+				status: 500,
+				headers: { ...SECURITY_HEADERS, 'Content-Type': 'application/json' }
+			});
+		}
+	},
+
+	error(err: Error) {
+		console.error('Global Server Error:', err);
+		return new Response(JSON.stringify({ error: 'Fatal Error' }), {
+			status: 500,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+};
+
+console.log(`🚀 Todo API started on http://localhost:${PORT}`);
